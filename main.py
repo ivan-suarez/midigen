@@ -1,22 +1,6 @@
-# This Python 3 environment comes with many helpful analytics libraries installed
-# It is defined by the kaggle/python Docker image: https://github.com/kaggle/docker-python
-# For example, here's several helpful packages to load
-
 import numpy as np # linear algebra
 import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
 
-# Input data files are available in the read-only "../input/" directory
-# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
-
-import os
-for dirname, _, filenames in os.walk('/kaggle/input'):
-    for filename in filenames:
-        print(os.path.join(dirname, filename))
-
-# You can write up to 20GB to the current directory (/kaggle/working/) that gets preserved as output when you create a version using "Save & Run All" 
-# You can also write temporary files to /kaggle/temp/, but they won't be saved outside of the current session
-
-!pip install pretty_midi
 
 import pretty_midi
 import os
@@ -62,7 +46,6 @@ for i in range(0, len(quantized_notes) - sequence_length):
 
 # You may need to further process these sequences depending on your network architecture
 
-import numpy as np
 
 # Example: one-hot encoding pitches
 #n_vocab = 128  # Number of possible pitches in MIDI
@@ -100,8 +83,6 @@ history = model.fit(sequences, next_notes,
                     batch_size=64,  # Size of the batches of data
                     verbose=1)  # Show training log
 
-#GENERATING
-import numpy as np
 
 def generate_notes(model, seed_sequence, num_notes_to_generate):
     generated_sequence = seed_sequence.copy()  # Copy the seed sequence
@@ -125,7 +106,6 @@ num_notes_to_generate = 100  # Number of notes you want to generate
 # Generate notes
 generated_notes = generate_notes(model, seed_sequence, num_notes_to_generate)
 
-!pip install mido
 
 from mido import MidiFile, MidiTrack, Message
 
