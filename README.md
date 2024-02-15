@@ -1,9 +1,9 @@
 Setup:
 
-pip install pretty_midi
+pip3 install pretty_midi
 
-pip install tensorflow
+pip3 install tensorflow
 
-pip install keras
+pip3 install keras
 
-pip install mido
+pip3 install mido
