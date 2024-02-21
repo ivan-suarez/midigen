@@ -1,0 +1,4 @@
+tensorflow
+keras
+pretty_midi
+mido
