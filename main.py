@@ -32,7 +32,7 @@ def quantize_notes(notes, time_step=0.25):
 
 quantized_notes = quantize_notes(notes)
 
-sequence_length = 50  # Number of notes in a sequence
+sequence_length = 1  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
@@ -66,7 +66,7 @@ from keras.models import Sequential
 from keras.layers import LSTM, Dense
 
 model = Sequential([
-    LSTM(256, return_sequences=True, input_shape=(50, 4)),  # Adjust the number of units based on model complexity
+    LSTM(256, return_sequences=True, input_shape=(sequence_length, 4)),  # Adjust the number of units based on model complexity
     LSTM(128),  # You can add more LSTM layers or adjust units
     Dense(64, activation='relu'),  # Intermediate dense layer, optional
     Dense(4)  # Output layer with 4 units for the four elements of the output tuple
@@ -81,4 +81,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/bach.keras')
+model.save('models/bach_one_note.keras')
