@@ -36,9 +36,15 @@ sequence_length = 1  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
+#for i in range(0, len(quantized_notes) - sequence_length):
+#    sequences.append(quantized_notes[i:i + sequence_length])
+#    next_notes.append(quantized_notes[i + sequence_length])
+
 for i in range(0, len(quantized_notes) - sequence_length):
-    sequences.append(quantized_notes[i:i + sequence_length])
-    next_notes.append(quantized_notes[i + sequence_length])
+    sequences.append(quantized_notes[i:i +sequence_length])
+    start_time, end_time, pitch, velocity = quantized_notes[i + sequence_length]
+    duration = end_time - start_time
+    next_notes.append((start_time, duration, pitch, velocity))
 
 # You may need to further process these sequences depending on your network architecture
 
@@ -81,4 +87,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/bach_one_note.keras')
+model.save('models/bach_one_note-0_2.keras')
