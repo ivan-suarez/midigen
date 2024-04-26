@@ -1,12 +1,12 @@
 import pretty_midi
 import os
 
-midi_files = [f for f in os.listdir('bach/') if f.endswith('.mid')]
+midi_files = [f for f in os.listdir('clean/') if f.endswith('.mid')]
 
 midis = []
 for file in midi_files:
     try:
-        midi = pretty_midi.PrettyMIDI('bach/' + file)
+        midi = pretty_midi.PrettyMIDI('clean/' + file)
         midis.append(midi)
     except Exception as e:
         print(f"Error loading {file}: {e}")
@@ -20,6 +20,21 @@ for midi in midis:
             note_info = (note.start, note.end, note.pitch, note.velocity)
             notes.append(note_info)
 
+
+def process_notes(midis):
+    all_notes = []
+    for midi in midis:
+        for instrument in midi.instruments:
+            prev_end_time = 0
+            for note in instrument.notes:
+                relative_start = note.start - prev_end_time
+                duration = note.end - note.start  # Calculate duration
+                note_info = (relative_start, duration, note.pitch, note.velocity)
+                all_notes.append(note_info)
+                prev_end_time = note.end
+    return all_notes
+
+
 def quantize_notes(notes, time_step=0.25):
     # Quantize start times and durations to the nearest time_step
     quantized_notes = []
@@ -30,9 +45,11 @@ def quantize_notes(notes, time_step=0.25):
         quantized_notes.append((quantized_start, quantized_end, pitch, velocity))
     return quantized_notes
 
-quantized_notes = quantize_notes(notes)
+#quantized_notes = quantize_notes(notes)
 
-sequence_length = 1  # Number of notes in a sequence
+quantized_notes = process_notes(midis)
+
+sequence_length = 10  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
@@ -41,10 +58,14 @@ next_notes = []
 #    next_notes.append(quantized_notes[i + sequence_length])
 
 for i in range(0, len(quantized_notes) - sequence_length):
-    sequences.append(quantized_notes[i:i +sequence_length])
-    start_time, end_time, pitch, velocity = quantized_notes[i + sequence_length]
-    duration = end_time - start_time
-    next_notes.append((start_time, duration, pitch, velocity))
+    sequences.append(quantized_notes[i:i + sequence_length])
+    next_notes.append(quantized_notes[i + sequence_length])
+
+#for i in range(0, len(quantized_notes) - sequence_length):
+#    sequences.append(quantized_notes[i:i +sequence_length])
+#    start_time, end_time, pitch, velocity = quantized_notes[i + sequence_length]
+ #   duration = end_time - start_time
+ #   next_notes.append((start_time, duration, pitch, velocity))
 
 # You may need to further process these sequences depending on your network architecture
 
@@ -87,4 +108,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/bach_one_note-0_2.keras')
+model.save('models/LSTM_0.3.1.keras')
