@@ -53,41 +53,11 @@ sequence_length = 10  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
-#for i in range(0, len(quantized_notes) - sequence_length):
-#    sequences.append(quantized_notes[i:i + sequence_length])
-#    next_notes.append(quantized_notes[i + sequence_length])
-
 for i in range(0, len(quantized_notes) - sequence_length):
     sequences.append(quantized_notes[i:i + sequence_length])
     next_notes.append(quantized_notes[i + sequence_length])
 
-#for i in range(0, len(quantized_notes) - sequence_length):
-#    sequences.append(quantized_notes[i:i +sequence_length])
-#    start_time, end_time, pitch, velocity = quantized_notes[i + sequence_length]
- #   duration = end_time - start_time
- #   next_notes.append((start_time, duration, pitch, velocity))
 
-# You may need to further process these sequences depending on your network architecture
-
-
-# Example: one-hot encoding pitches
-#n_vocab = 128  # Number of possible pitches in MIDI
-#encoded_sequences = np.zeros((len(sequences), sequence_length, n_vocab))
-
-#for i, sequence in enumerate(sequences):
-#    for j, note in enumerate(sequence):
-#        pitch = note[2]  # Assuming the third element is the pitch
-#        encoded_sequences[i, j, pitch] = 1
-
-#from sklearn.model_selection import train_test_split
-
-#X_train, X_val, y_train, y_val = train_test_split(encoded_sequences, next_notes, test_size=0.2)
-
-#np.save('/X_train.npy', X_train)
-#np.save('/X_val.npy', X_val)
-# Save y_train and y_val similarly
-
-# Assuming you have already defined and compiled your model as 'model'
 
 from keras.models import Sequential
 from keras.layers import LSTM, Dense
