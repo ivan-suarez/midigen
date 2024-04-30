@@ -1,12 +1,12 @@
 import pretty_midi
 import os
 
-midi_files = [f for f in os.listdir('clean/') if f.endswith('.mid')]
+midi_files = [f for f in os.listdir('data/') if f.endswith('.mid')]
 
 midis = []
 for file in midi_files:
     try:
-        midi = pretty_midi.PrettyMIDI('clean/' + file)
+        midi = pretty_midi.PrettyMIDI('data/' + file)
         midis.append(midi)
     except Exception as e:
         print(f"Error loading {file}: {e}")
@@ -17,7 +17,7 @@ notes = []
 for midi in midis:
     for instrument in midi.instruments:
         for note in instrument.notes:
-            note_info = (note.start, note.end, note.pitch, note.velocity)
+            note_info = note.pitch#(note.start, note.end, note.pitch, note.velocity)
             notes.append(note_info)
 
 
@@ -47,7 +47,7 @@ def quantize_notes(notes, time_step=0.25):
 
 #quantized_notes = quantize_notes(notes)
 
-quantized_notes = process_notes(midis)
+quantized_notes = notes # process_notes(midis)
 
 sequence_length = 10  # Number of notes in a sequence
 sequences = []
@@ -63,7 +63,7 @@ from keras.models import Sequential
 from keras.layers import LSTM, Dense
 
 model = Sequential([
-    LSTM(256, return_sequences=True, input_shape=(sequence_length, 4)),  # Adjust the number of units based on model complexity
+    LSTM(256, return_sequences=True, input_shape=(sequence_length, 1)),  # Adjust the number of units based on model complexity
     LSTM(128),  # You can add more LSTM layers or adjust units
     Dense(64, activation='relu'),  # Intermediate dense layer, optional
     Dense(4)  # Output layer with 4 units for the four elements of the output tuple
@@ -78,4 +78,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.3.1.keras')
+model.save('models/LSTM_0.4.0.keras')
