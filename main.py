@@ -1,5 +1,8 @@
 import pretty_midi
 import os
+from sklearn.preprocessing import StandardScaler
+import joblib
+import numpy as np
 
 midi_files = [f for f in os.listdir('data/') if f.endswith('.mid')]
 
@@ -47,15 +50,22 @@ def quantize_notes(notes, time_step=0.25):
 
 #quantized_notes = quantize_notes(notes)
 
-quantized_notes = notes # process_notes(midis)
+scaler = StandardScaler()
+features_array = np.array(notes)
+print(features_array.mean(), features_array.std())
+features_matrix = features_array.reshape(-1, 1)
+scaler.fit_transform(features_matrix) # process_notes(midis)
+scaled_notes = scaler.transform(features_matrix)
+scaled_notes = scaled_notes.reshape(-1).tolist()
+joblib.dump(scaler, 'scaler.save')
 
 sequence_length = 10  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
-for i in range(0, len(quantized_notes) - sequence_length):
-    sequences.append(quantized_notes[i:i + sequence_length])
-    next_notes.append(quantized_notes[i + sequence_length])
+for i in range(0, len(scaled_notes) - sequence_length):
+    sequences.append(scaled_notes[i:i + sequence_length])
+    next_notes.append(scaled_notes[i + sequence_length])
 
 
 
@@ -78,4 +88,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.4.0.keras')
+model.save('models/LSTM_0.5.0.keras')

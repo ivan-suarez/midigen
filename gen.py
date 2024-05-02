@@ -2,27 +2,38 @@ from mido import MidiFile, MidiTrack, Message
 
 from tensorflow.keras.models import load_model
 import numpy as np
+from sklearn.preprocessing import StandardScaler
+import joblib
 
 def generate():
-    model = load_model('models/LSTM_0.4.0.keras')
+    model = load_model('models/LSTM_0.5.0.keras')
 
-    starting_sequence = [(0.25, 0.1177083333333333, 67, 56),
-    (0.007291666666666696, 0.1177083333333333, 72, 60),
-    (0.007291666666666696, 0.1177083333333333, 76, 63),
-    (0.007291666666666696, 0.1177083333333333, 67, 50),
-    (0.007291666666666696, 0.1177083333333333, 72, 47),
-    (0.007291666666666696, 0.1177083333333333, 76, 47),
-    (0.2572916666666667, 0.1177083333333333, 67, 56),
-    (0.007291666666666696, 0.1177083333333333, 72, 60),
-    (0.007291666666666696, 0.1177083333333333, 76, 62),
-    (0.007291666666666696, 0.1177083333333333, 67, 50)]
+    starting_sequence = [(0.25, 0.1177083333333333, 0.125, 56),
+    (0.007291666666666696, 0.1177083333333333, 0.872, 60),
+    (0.007291666666666696, 0.1177083333333333, 1.446, 63),
+    (0.007291666666666696, 0.1177083333333333, 0.125, 50),
+    (0.007291666666666696, 0.1177083333333333, 0.872, 47),
+    (0.007291666666666696, 0.1177083333333333, 1.469, 47),
+    (0.2572916666666667, 0.1177083333333333, 0.125, 56),
+    (0.007291666666666696, 0.1177083333333333, 0.872, 60),
+    (0.007291666666666696, 0.1177083333333333, 1.469, 62),
+    (0.007291666666666696, 0.1177083333333333, 0.125, 50)]
 
     seed_sequence = [item[2] for item in starting_sequence]
 
     num_notes_to_generate = 100  # Number of notes you want to generate
     generated_notes = generate_notes(model, seed_sequence, num_notes_to_generate)
-    print(generated_notes)
-    create_midi_from_notes(generated_notes)
+   # print(generated_notes)
+
+    scaler = joblib.load('scaler.save')
+
+    notes_array = np.array(generated_notes)
+    print(notes_array.mean(), notes_array.std())
+    notes_matrix = notes_array.reshape(-1, 1)
+    
+    original_scale_notes = scaler.inverse_transform(notes_matrix)
+    original_scale_notes = original_scale_notes.reshape(-1).tolist()
+    create_midi_from_notes(original_scale_notes)
     return generated_notes
 
 def generate_notes(model, seed_sequence, num_notes_to_generate):
