@@ -74,9 +74,10 @@ from keras.layers import LSTM, Dense
 
 model = Sequential([
     LSTM(256, return_sequences=True, input_shape=(sequence_length, 1)),  # Adjust the number of units based on model complexity
-    LSTM(128),  # You can add more LSTM layers or adjust units
+    LSTM(128, return_sequences=True),  # You can add more LSTM layers or adjust units
+    LSTM(128),
     Dense(64, activation='relu'),  # Intermediate dense layer, optional
-    Dense(4)  # Output layer with 4 units for the four elements of the output tuple
+    Dense(1)  # Output layer with 4 units for the four elements of the output tuple
 ])
 
 model.compile(optimizer='adam', loss='mean_squared_error')
@@ -88,4 +89,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.5.0.keras')
+model.save('models/LSTM_0.5.3.keras')
