@@ -4,55 +4,38 @@ from tensorflow.keras.models import load_model
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 import joblib
+from keras.utils import to_categorical
 
 def generate():
-    model = load_model('models/LSTM_0.5.0.keras')
+    model = load_model('models/LSTM_0.6.0.keras')
 
-    starting_sequence = [(0.25, 0.1177083333333333, 0.125, 56),
-    (0.007291666666666696, 0.1177083333333333, 0.872, 60),
-    (0.007291666666666696, 0.1177083333333333, 1.446, 63),
-    (0.007291666666666696, 0.1177083333333333, 0.125, 50),
-    (0.007291666666666696, 0.1177083333333333, 0.872, 47),
-    (0.007291666666666696, 0.1177083333333333, 1.469, 47),
-    (0.2572916666666667, 0.1177083333333333, 0.125, 56),
-    (0.007291666666666696, 0.1177083333333333, 0.872, 60),
-    (0.007291666666666696, 0.1177083333333333, 1.469, 62),
-    (0.007291666666666696, 0.1177083333333333, 0.125, 50)]
+    num_pitches = 128  # MIDI pitches range from 0 to 127
+    seed_pitches = [56, 60, 63, 50, 47, 47, 56, 60, 62, 50]  # Example seed sequence pitches
 
-    seed_sequence = [item[2] for item in starting_sequence]
+    # One-hot encode the seed sequence
+    seed_sequence = to_categorical(seed_pitches, num_classes=num_pitches)
+
+
 
     num_notes_to_generate = 100  # Number of notes you want to generate
     generated_notes = generate_notes(model, seed_sequence, num_notes_to_generate)
    # print(generated_notes)
 
-    scaler = joblib.load('scaler.save')
+    # Convert from one-hot encoded notes back to pitches
+    generated_pitches = [np.argmax(note) for note in generated_notes]
 
-    notes_array = np.array(generated_notes)
-    print(notes_array.mean(), notes_array.std())
-    notes_matrix = notes_array.reshape(-1, 1)
-    
-    original_scale_notes = scaler.inverse_transform(notes_matrix)
-    original_scale_notes = original_scale_notes.reshape(-1).tolist()
-    create_midi_from_notes(original_scale_notes)
-    return generated_notes
+    # Here you would convert these pitches back into a MIDI file
+    create_midi_from_notes(generated_pitches)
+
+    return generated_pitches
 
 def generate_notes(model, seed_sequence, num_notes_to_generate):
-    generated_sequence = seed_sequence.copy()  # Copy the seed sequence
+    generated_sequence = seed_sequence.tolist()  # Copy the seed sequence
     for _ in range(num_notes_to_generate):
         # Reshape the sequence to match the model's input shape: (1, 50, 4)
-        sequence_length = 10
-        input_sequence = generated_sequence[-sequence_length :]
-        print(input_sequence)
-        input_sequence = np.array(input_sequence )
-        print(input_sequence)
-        input_sequence = input_sequence.reshape(1, sequence_length , 1)
-       # input_sequence = np.array(generated_sequence[-sequence_length :]).reshape(1, sequence_length , 1)
-        print(input_sequence)
-        # Predict the next note
-        predicted_note = model.predict(input_sequence)[0]  # model.predict returns a batch, so get the first
-        predicted_note = [int(x) for x in predicted_note]
-        # Append the predicted note to the sequence
-        generated_sequence.extend(predicted_note)
+        input_sequence = np.array(generated_sequence[-10:]).reshape(1, 10, 128)  # Shape for LSTM (1, sequence_length, features)
+        predicted_note = model.predict(input_sequence)[0]
+        generated_sequence.append(predicted_note) 
         
     return generated_sequence
 
@@ -64,7 +47,7 @@ def generate_notes(model, seed_sequence, num_notes_to_generate):
 # Generate notes
 #generated_notes = generate_notes(model, seed_sequence, num_notes_to_generate)
 
-def create_midi_from_notes(notes, output_file='generated_sequence.mid'):
+def create_midi_from_notes(pitches, output_file='generated_sequence.mid'):
     midi = MidiFile()
     track = MidiTrack()
     midi.tracks.append(track)
@@ -72,29 +55,10 @@ def create_midi_from_notes(notes, output_file='generated_sequence.mid'):
     # Assuming the first event happens at time 0
     last_event_time = 0
     
-    for note in notes:
-        print(note)
-        pitch = note
-        # Ensure non-negative delta times
-        #delta_time_on = max(0, start_time - last_event_time)
-        #delta_time_off = max(0, end_time - start_time)
-        # Assuming a standard conversion, adjust based on your actual data and tempo
-        milliseconds_per_tick = 1 / midi.ticks_per_beat  # For 120 BPM and 480 TPB
-        delta_time_on = int(0.1177/milliseconds_per_tick)
-        delta_time_off = int(0.1177/milliseconds_per_tick)
-
-        
-        # Update last event time for the next iteration
-        # For note_on, this is the start time of the current note
-       
-        # Add the note_on message
-        track.append(Message('note_on', note=int(pitch), velocity=50, time=delta_time_on))
-        # For note_off, update the last event time to be the end time of the current note
-       
-        
-        # Add the note_off message with time since the note_on
-        track.append(Message('note_off', note=int(pitch), velocity=0, time=delta_time_off))
-    
+    # Example MIDI message with fixed velocity and timing
+    for pitch in pitches:
+        track.append(Message('note_on', note=pitch, velocity=64, time=0))
+        track.append(Message('note_off', note=pitch, velocity=0, time=480))  # Placeholder timing
     midi.save(output_file)
   #  return output_file
 

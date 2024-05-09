@@ -3,6 +3,7 @@ import os
 from sklearn.preprocessing import StandardScaler
 import joblib
 import numpy as np
+from keras.utils import to_categorical
 
 midi_files = [f for f in os.listdir('data/') if f.endswith('.mid')]
 
@@ -24,48 +25,31 @@ for midi in midis:
             notes.append(note_info)
 
 
-def process_notes(midis):
+
+#quantized_notes = quantize_notes(notes)
+def process_and_encode_notes(midis):
     all_notes = []
     for midi in midis:
         for instrument in midi.instruments:
-            prev_end_time = 0
             for note in instrument.notes:
-                relative_start = note.start - prev_end_time
-                duration = note.end - note.start  # Calculate duration
-                note_info = (relative_start, duration, note.pitch, note.velocity)
-                all_notes.append(note_info)
-                prev_end_time = note.end
+                all_notes.append(note.pitch)
     return all_notes
 
+notes = process_and_encode_notes(midis)
 
-def quantize_notes(notes, time_step=0.25):
-    # Quantize start times and durations to the nearest time_step
-    quantized_notes = []
-    for note in notes:
-        start, end, pitch, velocity = note
-        quantized_start = round(start / time_step) * time_step
-        quantized_end = round(end / time_step) * time_step
-        quantized_notes.append((quantized_start, quantized_end, pitch, velocity))
-    return quantized_notes
-
-#quantized_notes = quantize_notes(notes)
-
-scaler = StandardScaler()
-features_array = np.array(notes)
-print(features_array.mean(), features_array.std())
-features_matrix = features_array.reshape(-1, 1)
-scaler.fit_transform(features_matrix) # process_notes(midis)
-scaled_notes = scaler.transform(features_matrix)
-scaled_notes = scaled_notes.reshape(-1).tolist()
-joblib.dump(scaler, 'scaler.save')
+num_classes = 128  # Number of MIDI note pitches
+encoded_notes = to_categorical(notes, num_classes=num_classes)
 
 sequence_length = 10  # Number of notes in a sequence
 sequences = []
 next_notes = []
 
-for i in range(0, len(scaled_notes) - sequence_length):
-    sequences.append(scaled_notes[i:i + sequence_length])
-    next_notes.append(scaled_notes[i + sequence_length])
+for i in range(len(encoded_notes) - sequence_length):
+    sequences.append(encoded_notes[i:i + sequence_length])
+    next_notes.append(encoded_notes[i + sequence_length])
+
+sequences = np.array(sequences)
+next_notes = np.array(next_notes)
 
 
 
@@ -73,14 +57,12 @@ from keras.models import Sequential
 from keras.layers import LSTM, Dense
 
 model = Sequential([
-    LSTM(256, return_sequences=True, input_shape=(sequence_length, 1)),  # Adjust the number of units based on model complexity
-    LSTM(128, return_sequences=True),  # You can add more LSTM layers or adjust units
+    LSTM(256, return_sequences=True, input_shape=(sequence_length, num_classes)),
     LSTM(128),
-    Dense(64, activation='relu'),  # Intermediate dense layer, optional
-    Dense(1)  # Output layer with 4 units for the four elements of the output tuple
+    Dense(num_classes, activation='softmax')
 ])
 
-model.compile(optimizer='adam', loss='mean_squared_error')
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
 
 print(model.summary())
 # Fit the model to the training data
@@ -89,4 +71,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.5.3.keras')
+model.save('models/LSTM_0.6.0.keras')
