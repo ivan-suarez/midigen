@@ -58,6 +58,7 @@ from keras.layers import LSTM, Dense
 
 model = Sequential([
     LSTM(256, return_sequences=True, input_shape=(sequence_length, num_classes)),
+    LSTM(128, return_sequences=True),
     LSTM(128),
     Dense(num_classes, activation='softmax')
 ])
@@ -71,4 +72,4 @@ history = model.fit(sequences, next_notes,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.6.0.keras')
+model.save('models/LSTM_0.6.1.keras')
