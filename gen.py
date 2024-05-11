@@ -7,7 +7,7 @@ import joblib
 from keras.utils import to_categorical
 
 def generate():
-    model = load_model('models/LSTM_0.6.1.keras')
+    model = load_model('models/LSTM_0.6.2.keras')
 
     num_pitches = 128  # MIDI pitches range from 0 to 127
     seed_pitches = [56, 60, 63, 50, 47, 47, 56, 60, 62, 50]  # Example seed sequence pitches
@@ -48,7 +48,7 @@ def generate_notes(model, seed_sequence, num_notes_to_generate):
 # Generate notes
 #generated_notes = generate_notes(model, seed_sequence, num_notes_to_generate)
 
-def create_midi_from_notes(pitches, output_file='generated_sequence2.mid'):
+def create_midi_from_notes(pitches, output_file='generated_sequence3.mid'):
     midi = MidiFile()
     track = MidiTrack()
     midi.tracks.append(track)
