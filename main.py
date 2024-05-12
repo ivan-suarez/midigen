@@ -5,7 +5,7 @@ import joblib
 import numpy as np
 from keras.utils import to_categorical
 
-midi_files = [f for f in os.listdir('data/') if f.endswith('.mid')]
+midi_files = [os.path.join(root, file) for root, dirs, files in os.walk('data/') for file in files if file.endswith('.mid')]
 
 midis = []
 for file in midi_files:
