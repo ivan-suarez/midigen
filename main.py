@@ -5,6 +5,7 @@ import joblib
 import numpy as np
 from keras.utils import to_categorical
 
+
 midi_files = [os.path.join(root, file) for root, dirs, files in os.walk('data/classical') for file in files if file.endswith('.mid')]
 
 midis = []
@@ -18,11 +19,9 @@ for file in midi_files:
 # Function to quantize note durations
 def quantize_duration(note_duration, tempo):
     # Convert note duration from seconds to a fraction of a whole note
-    print(note_duration)
     quarter_note_duration = 60 / tempo  # Duration of a quarter note in seconds
     whole_note_duration = 4 * quarter_note_duration
     duration_ratio = note_duration / quarter_note_duration
-    print(duration_ratio)
     # Define bins for whole, half, quarter, eighth, sixteenth notes (including a catch-all for longer durations)
     bins = [0, 0.25, 0.5, 0.75, 1, 1.5, 2, 4, np.inf]
     midpoints = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)]
@@ -30,8 +29,7 @@ def quantize_duration(note_duration, tempo):
     
     # Find the closest bin using midpoints
     category_index = np.digitize([duration_ratio], midpoints)[0] - 1
-    print(bins[category_index])
-    return bins[category_index]
+    return category_index
 
 
 
@@ -52,6 +50,8 @@ def process_and_encode_notes(midis):
 
 notes, durations = process_and_encode_notes(midis)
 
+print(f"Notes: {notes[:10]}")  # Debug: print first 10 notes
+print(f"Durations: {durations[:10]}")  # Debug: print first 10 durations
 
 
 num_classes = 128  # Number of MIDI note pitches
@@ -59,7 +59,24 @@ num_duration_classes = 8
 encoded_notes = to_categorical(notes, num_classes=num_classes)
 encoded_durations = to_categorical(durations, num_classes=num_duration_classes)
 
+#convert back again and check
+# Decode the notes and durations to verify the encoding
+decoded_notes = np.argmax(encoded_notes, axis=1)
+decoded_durations = np.argmax(encoded_durations, axis=1)
+#generated_pitches = [np.argmax(note[:num_pitches]) for note in generated_notes]
+#generated_durations = [np.argmax(note[num_pitches:num_pitches + num_duration_classes]) for note in generated_notes]
+
+print(f"Encoded Notes Shape: {encoded_notes.shape}")  # Debug: print shape of encoded notes
+print(f"Encoded Durations Shape: {encoded_durations.shape}")  # Debug: print shape of encoded durations
+print(f"Encoded Notes Example: {encoded_notes[:1]}")  # Debug: print first encoded note
+print(f"Encoded Durations Example: {encoded_durations[:1]}")  # Debug: print first encoded duration
+
+
 encoded_features = np.concatenate((encoded_notes, encoded_durations), axis=1)
+
+
+print(f"Encoded Features Shape: {encoded_features.shape}")  # Debug: print shape of encoded features
+print(f"Encoded Features Example: {encoded_features[:1]}")  # Debug: print first encoded feature
 
 
 sequence_length = 10  # Number of notes in a sequence
@@ -73,6 +90,9 @@ for i in range(len(encoded_features) - sequence_length):
 sequences = np.array(sequences)
 next_features = np.array(next_features)
 
+
+print(f"Sequences Shape: {sequences.shape}")  # Debug: print shape of sequences
+print(f"Next Features Shape: {next_features.shape}")  # Debug: print shape of next features
 
 
 from keras.models import Sequential
@@ -94,4 +114,4 @@ history = model.fit(sequences, next_features,
                 batch_size=64,  # Size of the batches of data
                 verbose=1)  # Show training log
 
-model.save('models/LSTM_0.7.1.keras')
+model.save('models/LSTM_0.7.2.keras')
