@@ -1,12 +1,14 @@
-import pretty_midi
 import os
-from sklearn.preprocessing import StandardScaler
-import joblib
 import numpy as np
+import pretty_midi
 from keras.utils import to_categorical
+from keras.models import Model
+from keras.layers import Input, LSTM, Dense
 
-
-midi_files = [os.path.join(root, file) for root, dirs, files in os.walk('data/classical') for file in files if file.endswith('.mid')]
+# 1. Load MIDI files from the 'data/classical' directory
+midi_files = [os.path.join(root, file)
+              for root, dirs, files in os.walk('data/classical')
+              for file in files if file.endswith('.mid')]
 
 midis = []
 for file in midi_files:
@@ -16,102 +18,106 @@ for file in midi_files:
     except Exception as e:
         print(f"Error loading {file}: {e}")
 
-# Function to quantize note durations
+# 2. Quantize note durations using fixed bins
 def quantize_duration(note_duration, tempo):
-    # Convert note duration from seconds to a fraction of a whole note
-    quarter_note_duration = 60 / tempo  # Duration of a quarter note in seconds
-    whole_note_duration = 4 * quarter_note_duration
+    # Calculate duration relative to a quarter note
+    quarter_note_duration = 60 / tempo
     duration_ratio = note_duration / quarter_note_duration
-    # Define bins for whole, half, quarter, eighth, sixteenth notes (including a catch-all for longer durations)
-    bins = [0, 0.25, 0.5, 0.75, 1, 1.5, 2, 4, np.inf]
-    midpoints = [(bins[i] + bins[i+1]) / 2 for i in range(len(bins) - 1)]
-    midpoints = [0] + midpoints + [np.inf]  # Add boundaries at 0 and inf for simplicity
-    
-    # Find the closest bin using midpoints
-    category_index = np.digitize([duration_ratio], midpoints)[0] - 1
+    # Define bin edges (note: np.digitize returns indices 0 ... len(bins))
+    bins = [0.25, 0.5, 0.75, 1, 1.5, 2, 4, np.inf]
+    category_index = np.digitize(duration_ratio, bins)
     return category_index
 
-
-
-#quantized_notes = quantize_notes(notes)
+# 3. Process MIDI files to extract note pitches and quantized durations
 def process_and_encode_notes(midis):
-    all_notes = []
-    all_durations = []
+    notes = []
+    durations = []
     for midi in midis:
-        tempo = midi.get_tempo_changes()[1][0]
+        # Use the first tempo value or default to 120 BPM if not available
+        try:
+            tempo_changes = midi.get_tempo_changes()
+            tempo = tempo_changes[1][0] if len(tempo_changes[1]) > 0 else 120
+        except Exception:
+            tempo = 120
         for instrument in midi.instruments:
-            for note in instrument.notes:
-                note_pitch = note.pitch
-                note_duration = note.end - note.start
-                quantized_duration = quantize_duration(note_duration, tempo)
-                all_notes.append(note_pitch)
-                all_durations.append(quantized_duration)
-    return all_notes, all_durations
+            # Optionally skip percussion instruments:
+            if not instrument.is_drum:
+                for note in instrument.notes:
+                    note_pitch = note.pitch
+                    note_duration = note.end - note.start
+                    quantized_duration = quantize_duration(note_duration, tempo)
+                    notes.append(note_pitch)
+                    durations.append(quantized_duration)
+    return notes, durations
 
 notes, durations = process_and_encode_notes(midis)
+print(f"First 10 notes: {notes[:10]}")
+print(f"First 10 durations: {durations[:10]}")
 
-print(f"Notes: {notes[:10]}")  # Debug: print first 10 notes
-print(f"Durations: {durations[:10]}")  # Debug: print first 10 durations
+# 4. Define number of classes for pitch and duration
+num_pitch_classes = 128  # MIDI pitches 0-127
+num_duration_classes = 9  # np.digitize with bins produces values 0..8
 
+# 5. Prepare sequences for training
+sequence_length = 10
+input_sequences = []
+target_pitches = []
+target_durations = []
 
-num_classes = 128  # Number of MIDI note pitches
-num_duration_classes = 8
-encoded_notes = to_categorical(notes, num_classes=num_classes)
-encoded_durations = to_categorical(durations, num_classes=num_duration_classes)
+# Create sequences where each input is a sequence of concatenated one-hot vectors,
+# and targets are the next note's pitch and duration (one-hot encoded separately)
+for i in range(len(notes) - sequence_length):
+    seq = []
+    for j in range(i, i + sequence_length):
+        pitch_vec = to_categorical(notes[j], num_classes=num_pitch_classes)
+        duration_vec = to_categorical(durations[j], num_classes=num_duration_classes)
+        combined = np.concatenate((pitch_vec, duration_vec))
+        seq.append(combined)
+    input_sequences.append(seq)
+    
+    target_pitch = to_categorical(notes[i + sequence_length], num_classes=num_pitch_classes)
+    target_duration = to_categorical(durations[i + sequence_length], num_classes=num_duration_classes)
+    target_pitches.append(target_pitch)
+    target_durations.append(target_duration)
 
-#convert back again and check
-# Decode the notes and durations to verify the encoding
-decoded_notes = np.argmax(encoded_notes, axis=1)
-decoded_durations = np.argmax(encoded_durations, axis=1)
-#generated_pitches = [np.argmax(note[:num_pitches]) for note in generated_notes]
-#generated_durations = [np.argmax(note[num_pitches:num_pitches + num_duration_classes]) for note in generated_notes]
+input_sequences = np.array(input_sequences)
+target_pitches = np.array(target_pitches)
+target_durations = np.array(target_durations)
 
-print(f"Encoded Notes Shape: {encoded_notes.shape}")  # Debug: print shape of encoded notes
-print(f"Encoded Durations Shape: {encoded_durations.shape}")  # Debug: print shape of encoded durations
-print(f"Encoded Notes Example: {encoded_notes[:1]}")  # Debug: print first encoded note
-print(f"Encoded Durations Example: {encoded_durations[:1]}")  # Debug: print first encoded duration
+print("Input Sequences Shape:", input_sequences.shape)
+print("Target Pitches Shape:", target_pitches.shape)
+print("Target Durations Shape:", target_durations.shape)
 
+# 6. Build a multi-output LSTM model using the Functional API
+input_shape = (sequence_length, num_pitch_classes + num_duration_classes)
+inputs = Input(shape=input_shape)
 
-encoded_features = np.concatenate((encoded_notes, encoded_durations), axis=1)
+x = LSTM(256, return_sequences=True)(inputs)
+x = LSTM(128, return_sequences=True)(x)
+x = LSTM(128)(x)
+shared = Dense(128, activation='relu')(x)
 
+# Separate output heads for pitch and duration
+pitch_output = Dense(num_pitch_classes, activation='softmax', name='pitch_output')(shared)
+duration_output = Dense(num_duration_classes, activation='softmax', name='duration_output')(shared)
 
-print(f"Encoded Features Shape: {encoded_features.shape}")  # Debug: print shape of encoded features
-print(f"Encoded Features Example: {encoded_features[:1]}")  # Debug: print first encoded feature
-
-
-sequence_length = 10  # Number of notes in a sequence
-sequences = []
-next_features = []
-
-for i in range(len(encoded_features) - sequence_length):
-    sequences.append(encoded_features[i:i + sequence_length])
-    next_features.append(encoded_features[i + sequence_length])
-
-sequences = np.array(sequences)
-next_features = np.array(next_features)
-
-
-print(f"Sequences Shape: {sequences.shape}")  # Debug: print shape of sequences
-print(f"Next Features Shape: {next_features.shape}")  # Debug: print shape of next features
-
-
-from keras.models import Sequential
-from keras.layers import LSTM, Dense
-
-model = Sequential([
-    LSTM(256, return_sequences=True, input_shape=(sequence_length, num_classes + num_duration_classes)),#modify
-    LSTM(128, return_sequences=True),
-    LSTM(128),
-    Dense(num_classes + num_duration_classes, activation='softmax')
-])
-
-model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+model = Model(inputs=inputs, outputs=[pitch_output, duration_output])
+model.compile(optimizer='adam',
+              loss={'pitch_output': 'categorical_crossentropy',
+                    'duration_output': 'categorical_crossentropy'},
+              metrics=['accuracy'])
 
 print(model.summary())
-# Fit the model to the training data
-history = model.fit(sequences, next_features,
-                epochs=50,  # Number of epochs to train for
-                batch_size=64,  # Size of the batches of data
-                verbose=1)  # Show training log
 
-model.save('models/LSTM_0.7.2.keras')
+# 7. Train the model
+history = model.fit(input_sequences,
+                    {'pitch_output': target_pitches, 'duration_output': target_durations},
+                    epochs=50,
+                    batch_size=64,
+                    verbose=1)
+
+# 8. Save the model (create directory if it doesn't exist)
+model_dir = 'models'
+if not os.path.exists(model_dir):
+    os.makedirs(model_dir)
+model.save(os.path.join(model_dir, 'LSTM_multi_output.keras'))
