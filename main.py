@@ -3,7 +3,8 @@ import numpy as np
 import pretty_midi
 from keras.utils import to_categorical
 from keras.models import Model
-from keras.layers import Input, LSTM, Dense
+from keras.layers import Input, LSTM, Dense, GlobalAveragePooling1D, Dropout, Attention, LayerNormalization
+import keras
 
 # 1. Load MIDI files from the 'data/classical' directory
 midi_files = [os.path.join(root, file)
@@ -23,8 +24,28 @@ def quantize_duration(note_duration, tempo):
     # Calculate duration relative to a quarter note
     quarter_note_duration = 60 / tempo
     duration_ratio = note_duration / quarter_note_duration
-    # Define bin edges (note: np.digitize returns indices 0 ... len(bins))
-    bins = [0.25, 0.5, 0.75, 1, 1.5, 2, 4, np.inf]
+    
+    # Define bin edges for duration categories
+    # Category 0: <= 0.125 (32nd notes and shorter)
+    # Category 1: > 0.125 and <= 0.25 (16th notes)
+    # Category 2: > 0.25 and <= 0.5 (8th notes)
+    # Category 3: > 0.5 and <= 0.75 (dotted 8th notes)
+    # Category 4: > 0.75 and <= 1.0 (quarter notes)
+    # Category 5: > 1.0 and <= 1.5 (dotted quarter notes)
+    # Category 6: > 1.5 and <= 2.0 (half notes)
+    # Category 7: > 2.0 and <= 3.0 (dotted half notes)
+    # Category 8: > 3.0 (whole notes and longer)
+    bins = [0.125, 0.25, 0.5, 0.75, 1.0, 1.5, 2.0, 3.0, np.inf]
+    
+    # Debug info (using a static counter to limit output)
+    if not hasattr(quantize_duration, 'debug_count'):
+        quantize_duration.debug_count = 0
+    
+    if quantize_duration.debug_count < 5:
+        print(f"Note duration: {note_duration:.4f}s, Quarter note: {quarter_note_duration:.4f}s")
+        print(f"Duration ratio: {duration_ratio:.4f}, Category: {np.digitize(duration_ratio, bins)}")
+        quantize_duration.debug_count += 1
+    
     category_index = np.digitize(duration_ratio, bins)
     return category_index
 
@@ -92,10 +113,26 @@ print("Target Durations Shape:", target_durations.shape)
 input_shape = (sequence_length, num_pitch_classes + num_duration_classes)
 inputs = Input(shape=input_shape)
 
-x = LSTM(256, return_sequences=True)(inputs)
-x = LSTM(128, return_sequences=True)(x)
-x = LSTM(128)(x)
-shared = Dense(128, activation='relu')(x)
+# First LSTM layer
+lstm1 = LSTM(256, return_sequences=True, recurrent_dropout=0.1)(inputs)
+lstm1 = LayerNormalization()(lstm1)
+
+# Second LSTM layer
+lstm2 = LSTM(128, return_sequences=True, recurrent_dropout=0.1)(lstm1)
+lstm2 = LayerNormalization()(lstm2)
+
+# Apply Keras built-in Attention layer
+# Self-attention on the sequence
+attention_output = Attention()([lstm2, lstm2])
+# Add dropout for regularization
+attention_output = Dropout(0.2)(attention_output)
+
+# Final LSTM layer processes the attention-weighted sequence
+lstm3 = LSTM(128)(attention_output)
+lstm3 = Dropout(0.2)(lstm3)
+
+# Dense layer for shared representation
+shared = Dense(128, activation='relu')(lstm3)
 
 # Separate output heads for pitch and duration
 pitch_output = Dense(num_pitch_classes, activation='softmax', name='pitch_output')(shared)
